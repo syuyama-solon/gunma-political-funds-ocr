@@ -1,6 +1,7 @@
 import os
 import logging
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
+import pandas as pd
 from .config import Config
 
 # ロガーの設定
@@ -78,3 +79,58 @@ class OCRProcessor:
         """
         # 実際のAPI呼び出しは後で実装
         pass
+    
+    def process_folder(self, folder_path: str, form_type: str) -> pd.DataFrame:
+        """
+        フォルダ内の全画像ファイルをOCR処理する
+        
+        Args:
+            folder_path: 画像フォルダのパス
+            form_type: 様式タイプ
+            
+        Returns:
+            処理結果を含むDataFrame
+        """
+        results = []
+        
+        # サポートする画像形式
+        supported_extensions = ('.png', '.jpg', '.jpeg', '.pdf')
+        
+        # フォルダ内のファイルを処理
+        for filename in os.listdir(folder_path):
+            if filename.lower().endswith(supported_extensions):
+                file_path = os.path.join(folder_path, filename)
+                
+                try:
+                    result = self.process_single_image(file_path, form_type)
+                    
+                    if result and "pages" in result:
+                        # 各ページの結果を行として追加
+                        for page in result["pages"]:
+                            results.append({
+                                "filename": filename,
+                                "page": page["page_number"],
+                                "ocr_result": page["text"]
+                            })
+                    
+                except Exception as e:
+                    logger.error(f"Error processing {filename}: {str(e)}")
+                    continue
+        
+        # DataFrameに変換
+        if results:
+            return pd.DataFrame(results)
+        else:
+            # 空のDataFrameを返す（適切な列を持つ）
+            return pd.DataFrame(columns=["filename", "page", "ocr_result"])
+    
+    def save_to_csv(self, df: pd.DataFrame, output_path: str) -> None:
+        """
+        DataFrameをCSVファイルに保存する
+        
+        Args:
+            df: 保存するDataFrame
+            output_path: 出力CSVファイルのパス
+        """
+        df.to_csv(output_path, index=False, encoding='utf-8-sig')
+        logger.info(f"CSV saved to: {output_path}")

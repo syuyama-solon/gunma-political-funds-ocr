@@ -1,0 +1,7 @@
+{
+    "model_mapping": {
+        "様式A": "your-model-id-for-form-a",
+        "様式B": "your-model-id-for-form-b",
+        "様式C": "your-model-id-for-form-c"
+    }
+}
