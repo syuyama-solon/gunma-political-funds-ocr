@@ -1,5 +1,10 @@
+import os
+import logging
 from typing import Dict, Any, Optional
 from .config import Config
+
+# ロガーの設定
+logger = logging.getLogger(__name__)
 
 
 class OCRProcessor:
@@ -34,9 +39,19 @@ class OCRProcessor:
         Returns:
             OCR結果を含む辞書。エラー時はNone
         """
-        # テストを通すための最小限の実装
-        result = self._call_azure_api(image_path, form_type)
-        return result
+        try:
+            # ファイルの存在確認
+            if not os.path.exists(image_path):
+                logger.error(f"File not found: {image_path}")
+                return None
+            
+            # APIを呼び出す
+            result = self._call_azure_api(image_path, form_type)
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error processing {image_path}: {str(e)}")
+            return None
     
     def get_model_id(self, form_type: str) -> Optional[str]:
         """
