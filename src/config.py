@@ -36,8 +36,10 @@ class Config:
         """
         # 環境変数から読み込み（デフォルト）
         mapping = {
-            "様式A": os.getenv("MODEL_ID_FORM_A", ""),
-            "様式B": os.getenv("MODEL_ID_FORM_B", ""),
+            "6-5": os.getenv("MODEL_ID_FORM_6_5", ""),
+            "6-2-5": os.getenv("MODEL_ID_FORM_6_2_5", ""),
+            "7-5": os.getenv("MODEL_ID_FORM_7_5", ""),
+            "7-3-5": os.getenv("MODEL_ID_FORM_7_3_5", ""),
         }
         
         # 設定ファイルがあれば上書き

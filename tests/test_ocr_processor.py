@@ -28,7 +28,7 @@ class TestOCRProcessor:
         with patch('os.path.exists', return_value=True):
             with patch.object(processor, '_call_azure_api', return_value=mock_result):
                 # Act
-                result = processor.process_single_image("test.jpg", "様式A")
+                result = processor.process_single_image("test.jpg", "6-5")
                 
                 # Assert
                 assert result is not None
@@ -45,15 +45,17 @@ class TestOCRProcessor:
         
         # モデルマッピングを設定
         processor.model_mapping = {
-            "様式A": "model_id_a",
-            "様式B": "model_id_b",
-            "様式C": "model_id_c"
+            "6-5": "model_id_6_5",
+            "6-2-5": "model_id_6_2_5",
+            "7-5": "model_id_7_5",
+            "7-3-5": "model_id_7_3_5"
         }
         
         # Act & Assert
-        assert processor.get_model_id("様式A") == "model_id_a"
-        assert processor.get_model_id("様式B") == "model_id_b"
-        assert processor.get_model_id("様式C") == "model_id_c"
+        assert processor.get_model_id("6-5") == "model_id_6_5"
+        assert processor.get_model_id("6-2-5") == "model_id_6_2_5"
+        assert processor.get_model_id("7-5") == "model_id_7_5"
+        assert processor.get_model_id("7-3-5") == "model_id_7_3_5"
     
     def test_未定義の様式が指定された場合はNoneを返すこと(self):
         # Arrange
@@ -62,12 +64,12 @@ class TestOCRProcessor:
         processor = OCRProcessor(endpoint, api_key)
         
         processor.model_mapping = {
-            "様式A": "model_id_a",
-            "様式B": "model_id_b"
+            "6-5": "model_id_6_5",
+            "6-2-5": "model_id_6_2_5"
         }
         
         # Act & Assert
-        assert processor.get_model_id("様式Z") is None
+        assert processor.get_model_id("8-5") is None
     
     def test_OCR処理失敗時にエラーログが出力されスキップされること(self, caplog):
         # Arrange
@@ -81,7 +83,7 @@ class TestOCRProcessor:
             with patch.object(processor, '_call_azure_api', side_effect=Exception("API Error")):
                 with caplog.at_level(logging.ERROR):
                     # Act
-                    result = processor.process_single_image("broken.jpg", "様式A")
+                    result = processor.process_single_image("broken.jpg", "6-5")
                     
                     # Assert
                     assert result is None
@@ -96,7 +98,7 @@ class TestOCRProcessor:
         
         with caplog.at_level(logging.ERROR):
             # Act
-            result = processor.process_single_image("nonexistent.jpg", "様式A")
+            result = processor.process_single_image("nonexistent.jpg", "6-5")
             
             # Assert
             assert result is None

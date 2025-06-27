@@ -35,7 +35,7 @@ def main():
     parser.add_argument(
         'form_type',
         type=str,
-        help='処理する様式タイプ（例: 様式A, 様式B）'
+        help='処理する様式タイプ（6-5, 6-2-5, 7-5, 7-3-5）'
     )
     parser.add_argument(
         '-o', '--output',

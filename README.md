@@ -37,8 +37,10 @@ cp .env.example .env
 ```
 AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT=https://your-resource-name.cognitiveservices.azure.com/
 AZURE_DOCUMENT_INTELLIGENCE_KEY=your-api-key-here
-MODEL_ID_FORM_A=your-model-id-for-form-a
-MODEL_ID_FORM_B=your-model-id-for-form-b
+MODEL_ID_FORM_6_5=your-model-id-for-form-6-5
+MODEL_ID_FORM_6_2_5=your-model-id-for-form-6-2-5
+MODEL_ID_FORM_7_5=your-model-id-for-form-7-5
+MODEL_ID_FORM_7_3_5=your-model-id-for-form-7-3-5
 ```
 
 ## 使用方法
@@ -52,7 +54,7 @@ python main.py <入力フォルダパス> <様式タイプ> [オプション]
 #### 引数
 
 - `input_folder`: 処理する画像ファイルが含まれるフォルダのパス
-- `form_type`: 処理する様式タイプ（例: 様式A、様式B）
+- `form_type`: 処理する様式タイプ（6-5、6-2-5、7-5、7-3-5）
 
 #### オプション
 
@@ -64,16 +66,16 @@ python main.py <入力フォルダパス> <様式タイプ> [オプション]
 
 ```bash
 # 基本的な使用
-python main.py ./images 様式A
+python main.py ./images 6-5
 
 # 出力ファイルを指定
-python main.py ./images 様式B -o result.csv
+python main.py ./images 6-2-5 -o result.csv
 
 # 設定ファイルを使用
-python main.py ./images 様式A -c config.json
+python main.py ./images 7-5 -c config.json
 
 # 詳細ログ付き
-python main.py ./images 様式A -v
+python main.py ./images 7-3-5 -v
 ```
 
 ### 設定ファイル
@@ -84,9 +86,10 @@ python main.py ./images 様式A -v
 ```json
 {
     "model_mapping": {
-        "様式A": "model-id-1",
-        "様式B": "model-id-2",
-        "様式C": "model-id-3"
+        "6-5": "model-id-1",
+        "6-2-5": "model-id-2",
+        "7-5": "model-id-3",
+        "7-3-5": "model-id-4"
     }
 }
 ```

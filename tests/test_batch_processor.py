@@ -48,7 +48,7 @@ class TestBatchProcessor:
                     ]
                     
                     # Act
-                    df = processor.process_folder("./images", "様式A")
+                    df = processor.process_folder("./images", "6-5")
                     
                     # Assert
                     assert len(df) == 3
@@ -106,7 +106,7 @@ class TestBatchProcessor:
                     mock_process.return_value = {"text": "テキスト", "pages": [{"page_number": 1, "text": "テキスト"}]}
                     
                     # Act
-                    df = processor.process_folder("./images", "様式A")
+                    df = processor.process_folder("./images", "6-5")
                     
                     # Assert
                     # 画像ファイルのみ処理されている
