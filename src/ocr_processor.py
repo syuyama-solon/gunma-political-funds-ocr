@@ -77,8 +77,51 @@ class OCRProcessor:
         Returns:
             API応答
         """
-        # 実際のAPI呼び出しは後で実装
-        pass
+        from azure.ai.formrecognizer import DocumentAnalysisClient
+        from azure.core.credentials import AzureKeyCredential
+        
+        # モデルIDの取得
+        model_id = self.get_model_id(form_type)
+        if not model_id:
+            raise ValueError(f"モデルIDが見つかりません: {form_type}")
+        
+        # クライアントの初期化
+        client = DocumentAnalysisClient(
+            endpoint=self.endpoint,
+            credential=AzureKeyCredential(self.api_key)
+        )
+        
+        # ファイルを読み込む
+        with open(image_path, "rb") as f:
+            # カスタムモデルで分析を開始
+            poller = client.begin_analyze_document(
+                model_id=model_id,
+                document=f
+            )
+            result = poller.result()
+        
+        # 結果を整形
+        pages = []
+        full_text = []
+        
+        for page_idx, page in enumerate(result.pages):
+            page_text = ""
+            
+            # 各ページのコンテンツを抽出
+            if hasattr(page, 'lines') and page.lines:
+                for line in page.lines:
+                    page_text += line.content + "\n"
+            
+            pages.append({
+                "page_number": page_idx + 1,
+                "text": page_text.strip()
+            })
+            full_text.append(page_text)
+        
+        return {
+            "text": "\n".join(full_text).strip(),
+            "pages": pages
+        }
     
     def process_folder(self, folder_path: str, form_type: str) -> pd.DataFrame:
         """
