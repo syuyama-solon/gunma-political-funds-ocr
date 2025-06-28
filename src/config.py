@@ -21,6 +21,9 @@ class Config:
         self.endpoint = os.getenv("AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT", "")
         self.api_key = os.getenv("AZURE_DOCUMENT_INTELLIGENCE_KEY", "")
         
+        # OpenAI設定
+        self.openai_api_key = os.getenv("OPENAI_API_KEY", "")
+        
         # モデルマッピング
         self.model_mapping = self._load_model_mapping(config_file)
     

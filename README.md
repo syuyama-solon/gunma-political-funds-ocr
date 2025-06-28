@@ -8,6 +8,8 @@
 - 複数の様式に対応（様式ごとに異なる学習済みモデルを使用）
 - エラーハンドリングとログ出力
 - TSV（タブ区切り）形式での結果出力（カンマを含むデータに対応）
+- 領収書画像の自動切り出し
+- OpenAI Vision APIによる領収書内容の自動解析（支出先名、住所、日付、用途）
 
 ## 必要条件
 
@@ -41,6 +43,7 @@ MODEL_ID_FORM_6_5=your-model-id-for-form-6-5
 MODEL_ID_FORM_6_2_5=your-model-id-for-form-6-2-5
 MODEL_ID_FORM_7_5=your-model-id-for-form-7-5
 MODEL_ID_FORM_7_3_5=your-model-id-for-form-7-3-5
+OPENAI_API_KEY=your-openai-api-key-here  # 領収書解析を使用する場合
 ```
 
 ## 使用方法
@@ -61,6 +64,8 @@ python main.py <入力フォルダパス> <様式タイプ> [オプション]
 - `-o, --output`: 出力TSVファイルのパス（デフォルト: output.tsv）
 - `-c, --config`: 設定ファイルのパス（JSON形式）
 - `-v, --verbose`: 詳細なログ出力を有効にする
+- `--no-extract-receipts`: 領収書画像の抽出を無効にする
+- `--no-analyze-receipts`: 領収書画像のOpenAI解析を無効にする
 
 #### 実行例
 
@@ -76,6 +81,12 @@ python main.py ./images 7-5 -c config.json
 
 # 詳細ログ付き
 python main.py ./images 7-3-5 -v
+
+# 領収書解析なしで高速処理
+python main.py ./images 6-5 --no-analyze-receipts
+
+# 領収書抽出も無効化
+python main.py ./images 6-5 --no-extract-receipts
 ```
 
 ### 設定ファイル
@@ -96,13 +107,21 @@ python main.py ./images 7-3-5 -v
 
 ## 出力形式
 
-TSVファイルは以下の列を含みます（タブ区切り）：
+TSVファイルは以下の主要な列を含みます（タブ区切り）：
 
 | 列名 | 説明 |
 |------|------|
+| folder_name | 処理したフォルダ名 |
 | filename | 処理した画像ファイル名 |
-| page | ページ番号 |
-| ocr_result | OCRで抽出されたテキスト |
+| model_name | 使用したAzureモデルID |
+| type | 様式タイプ |
+| receipt_image_area | 領収書画像の座標情報 |
+| page_number_on_pdf | PDFのページ番号 |
+| payee_name | 支出先名（OpenAI解析） |
+| payee_address | 支出先住所（OpenAI解析） |
+| payment_date_extracted | 支出日（OpenAI解析） |
+| payment_purpose | 支払い用途（OpenAI解析） |
+| その他の列 | Azure OCRで抽出された各種フィールド |
 
 ## 開発
 

@@ -60,6 +60,12 @@ def main():
         help='領収書画像の抽出を無効にする'
     )
     
+    parser.add_argument(
+        '--no-analyze-receipts',
+        action='store_true',
+        help='領収書画像のOpenAI解析を無効にする'
+    )
+    
     args = parser.parse_args()
     
     # ロギング設定
@@ -81,7 +87,8 @@ def main():
         processor = OCRProcessor(
             endpoint=config.endpoint,
             api_key=config.api_key,
-            config=config
+            config=config,
+            openai_api_key=config.openai_api_key
         )
         
         # 入力フォルダの確認
@@ -102,10 +109,22 @@ def main():
         
         # 領収書画像抽出の設定
         extract_receipts = not args.no_extract_receipts
+        analyze_receipts = not args.no_analyze_receipts
+        
         if extract_receipts:
             logger.info("領収書画像の抽出を有効にしています")
+        if analyze_receipts and config.openai_api_key:
+            logger.info("領収書画像のOpenAI解析を有効にしています")
+        elif analyze_receipts and not config.openai_api_key:
+            logger.warning("OpenAI APIキーが設定されていません。領収書解析はスキップされます。")
+            analyze_receipts = False
         
-        df = processor.process_folder(str(input_path), args.form_type, extract_receipts=extract_receipts)
+        df = processor.process_folder(
+            str(input_path), 
+            args.form_type, 
+            extract_receipts=extract_receipts,
+            analyze_receipts=analyze_receipts
+        )
         
         if df.empty:
             logger.warning("処理対象のファイルが見つかりませんでした。")

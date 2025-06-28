@@ -5,6 +5,7 @@ import pandas as pd
 from PIL import Image
 import re
 from .config import Config
+from .receipt_analyzer import ReceiptAnalyzer
 
 # ロガーの設定
 logger = logging.getLogger(__name__)
@@ -13,7 +14,7 @@ logger = logging.getLogger(__name__)
 class OCRProcessor:
     """Azure Document Intelligenceを使用したOCR処理クラス"""
     
-    def __init__(self, endpoint: str, api_key: str, config: Optional[Config] = None):
+    def __init__(self, endpoint: str, api_key: str, config: Optional[Config] = None, openai_api_key: Optional[str] = None):
         """
         OCRProcessorの初期化
         
@@ -21,6 +22,7 @@ class OCRProcessor:
             endpoint: Azure Document Intelligenceのエンドポイント
             api_key: APIキー
             config: 設定オブジェクト（オプション）
+            openai_api_key: OpenAI APIキー（オプション）
         """
         self.endpoint = endpoint
         self.api_key = api_key
@@ -30,6 +32,11 @@ class OCRProcessor:
             self.model_mapping = config.model_mapping
         else:
             self.model_mapping = {}  # 様式とモデルIDのマッピング
+            
+        # OpenAI解析器の初期化
+        self.receipt_analyzer = None
+        if openai_api_key:
+            self.receipt_analyzer = ReceiptAnalyzer(openai_api_key)
         
     def process_single_image(self, image_path: str, form_type: str) -> Optional[Dict[str, Any]]:
         """
@@ -157,7 +164,7 @@ class OCRProcessor:
                 "pages": pages
             }
     
-    def process_folder(self, folder_path: str, form_type: str, extract_receipts: bool = True) -> pd.DataFrame:
+    def process_folder(self, folder_path: str, form_type: str, extract_receipts: bool = True, analyze_receipts: bool = True) -> pd.DataFrame:
         """
         フォルダ内の全画像ファイルをOCR処理する
         
@@ -165,6 +172,7 @@ class OCRProcessor:
             folder_path: 画像フォルダのパス
             form_type: 様式タイプ
             extract_receipts: 領収書画像を抽出するかどうか
+            analyze_receipts: 領収書画像をOpenAIで解析するかどうか
             
         Returns:
             処理結果を含むDataFrame
@@ -215,11 +223,16 @@ class OCRProcessor:
                                         row_data[field_name] = field_value
                                 
                                 # 領収書画像を抽出
+                                receipt_image_path = None
                                 if extract_receipts and "receipt_image_area" in row_data:
                                     receipt_area = row_data["receipt_image_area"]
                                     if receipt_area:
                                         coords = self._parse_coordinates(receipt_area)
                                         if coords:
+                                            base_name = os.path.splitext(filename)[0]
+                                            receipt_filename = f"{base_name}_receipt_{doc_idx}.jpg"
+                                            receipt_image_path = os.path.join(receipt_folder, receipt_filename)
+                                            
                                             self._crop_and_save_image(
                                                 file_path,
                                                 coords,
@@ -228,6 +241,23 @@ class OCRProcessor:
                                                 doc_idx
                                             )
                                             logger.info(f"Receipt image extracted from {filename}")
+                                            
+                                            # OpenAIで領収書を解析
+                                            if analyze_receipts and self.receipt_analyzer and receipt_image_path:
+                                                try:
+                                                    receipt_info = self.receipt_analyzer.analyze_receipt_image(receipt_image_path)
+                                                    # 解析結果を行データに追加
+                                                    row_data["payee_name"] = receipt_info.get("payee_name", "")
+                                                    row_data["payee_address"] = receipt_info.get("payee_address", "")
+                                                    row_data["payment_date_extracted"] = receipt_info.get("payment_date", "")
+                                                    row_data["payment_purpose"] = receipt_info.get("payment_purpose", "")
+                                                    logger.info(f"Receipt analysis completed for {receipt_filename}")
+                                                except Exception as e:
+                                                    logger.error(f"Error analyzing receipt: {str(e)}")
+                                                    row_data["payee_name"] = ""
+                                                    row_data["payee_address"] = ""
+                                                    row_data["payment_date_extracted"] = ""
+                                                    row_data["payment_purpose"] = ""
                                 
                                 results.append(row_data)
                     elif result and "pages" in result:
@@ -247,7 +277,8 @@ class OCRProcessor:
         if results:
             df = pd.DataFrame(results)
             # 列の順序を整理（folder_name, filename, model_name, type, receipt_image_area, page_number_on_pdf, page_numberを最初に配置）
-            priority_cols = ["folder_name", "filename", "model_name", "type", "receipt_image_area", "page_number_on_pdf", "page_number"]
+            priority_cols = ["folder_name", "filename", "model_name", "type", "receipt_image_area", "page_number_on_pdf", "page_number",
+                            "payee_name", "payee_address", "payment_date_extracted", "payment_purpose"]
             other_cols = [col for col in df.columns if col not in priority_cols]
             ordered_cols = [col for col in priority_cols if col in df.columns] + other_cols
             return df[ordered_cols]
