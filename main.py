@@ -66,6 +66,21 @@ def main():
         help='領収書画像のOpenAI解析を無効にする'
     )
     
+    parser.add_argument(
+        '--ai-mode',
+        type=int,
+        choices=[1, 2, 3, 4],
+        default=1,
+        help='AI評価列の出力モード: 1=すべて出力(デフォルト), 2=すべて出力しない, 3=特定列のみ除外, 4=特定列のみ出力'
+    )
+    
+    parser.add_argument(
+        '--ai-columns',
+        type=str,
+        nargs='*',
+        help='モード3,4で対象となるAI列名（AI__プレフィックスなしで指定。例: payee_name validity_score）'
+    )
+    
     args = parser.parse_args()
     
     # ロギング設定
@@ -123,7 +138,9 @@ def main():
             str(input_path), 
             args.form_type, 
             extract_receipts=extract_receipts,
-            analyze_receipts=analyze_receipts
+            analyze_receipts=analyze_receipts,
+            ai_mode=args.ai_mode,
+            ai_columns=args.ai_columns
         )
         
         if df.empty:

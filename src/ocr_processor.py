@@ -21,8 +21,8 @@ class OCRProcessor:
         Args:
             endpoint: Azure Document Intelligenceのエンドポイント
             api_key: APIキー
-            config: 設定オブジェクト（オプション）
-            openai_api_key: OpenAI APIキー（オプション）
+            config: 設定オブジェクト(オプション)
+            openai_api_key: OpenAI APIキー(オプション)
         """
         self.endpoint = endpoint
         self.api_key = api_key
@@ -44,7 +44,7 @@ class OCRProcessor:
         
         Args:
             image_path: 画像ファイルのパス
-            form_type: 様式タイプ（例: "様式A", "様式B"）
+            form_type: 様式タイプ(例: "様式A", "様式B")
             
         Returns:
             OCR結果を含む辞書。エラー時はNone
@@ -77,7 +77,7 @@ class OCRProcessor:
     
     def _call_azure_api(self, image_path: str, form_type: str) -> Dict[str, Any]:
         """
-        Azure APIを呼び出す（プライベートメソッド）
+        Azure APIを呼び出す(プライベートメソッド)
         
         Args:
             image_path: 画像ファイルのパス
@@ -141,7 +141,7 @@ class OCRProcessor:
             
             return {"documents": documents}
         else:
-            # 通常のテキスト抽出（フォールバック）
+            # 通常のテキスト抽出(フォールバック)
             pages = []
             full_text = []
             
@@ -164,7 +164,7 @@ class OCRProcessor:
                 "pages": pages
             }
     
-    def process_folder(self, folder_path: str, form_type: str, extract_receipts: bool = True, analyze_receipts: bool = True) -> pd.DataFrame:
+    def process_folder(self, folder_path: str, form_type: str, extract_receipts: bool = True, analyze_receipts: bool = True, ai_mode: int = 1, ai_columns: Optional[List[str]] = None) -> pd.DataFrame:
         """
         フォルダ内の全画像ファイルをOCR処理する
         
@@ -173,6 +173,8 @@ class OCRProcessor:
             form_type: 様式タイプ
             extract_receipts: 領収書画像を抽出するかどうか
             analyze_receipts: 領収書画像をOpenAIで解析するかどうか
+            ai_mode: AI評価列の出力モード (1=すべて出力, 2=すべて出力しない, 3=特定列のみ除外, 4=特定列のみ出力)
+            ai_columns: モード3,4で対象となるAI列名のリスト(AI__プレフィックスなし)
             
         Returns:
             処理結果を含むDataFrame
@@ -206,21 +208,65 @@ class OCRProcessor:
                                     "type": form_type  # 様式タイプを追加
                                 }
                                 
-                                # receipt_image_area を最初に追加（typeの直後に配置するため）
+                                # receipt_image_area を最初に追加(typeの直後に配置するため)
                                 if "receipt_image_area" in doc["fields"]:
-                                    row_data["receipt_image_area"] = doc["fields"]["receipt_image_area"]
+                                    field_value = doc["fields"]["receipt_image_area"]
+                                    # フィールドの値を適切に抽出
+                                    if hasattr(field_value, 'value'):
+                                        row_data["receipt_image_area"] = field_value.value
+                                    elif hasattr(field_value, 'content'):
+                                        row_data["receipt_image_area"] = field_value.content
+                                    elif isinstance(field_value, dict):
+                                        if 'valueString' in field_value:
+                                            row_data["receipt_image_area"] = field_value['valueString']
+                                        elif 'content' in field_value:
+                                            row_data["receipt_image_area"] = field_value['content']
+                                        else:
+                                            row_data["receipt_image_area"] = str(field_value)
+                                    else:
+                                        row_data["receipt_image_area"] = field_value
                                 
-                                # page_number_on_pdf を追加（ファイル名から抽出）
+                                # page_number_on_pdf を追加(ファイル名から抽出)
                                 page_match = re.search(r'page_(\d+)', filename)
                                 if page_match:
                                     row_data["page_number_on_pdf"] = int(page_match.group(1))
                                 else:
                                     row_data["page_number_on_pdf"] = None
                                 
-                                # すべてのフィールドを列として追加（receipt_image_areaは既に追加済みなのでスキップ）
+                                # すべてのフィールドを列として追加(receipt_image_areaは既に追加済みなのでスキップ)
                                 for field_name, field_value in doc["fields"].items():
                                     if field_name != "receipt_image_area":
-                                        row_data[field_name] = field_value
+                                        # フィールドの値を適切に抽出
+                                        if hasattr(field_value, 'value'):
+                                            # AnalyzedDocument形式の場合
+                                            row_data[field_name] = field_value.value
+                                        elif hasattr(field_value, 'content'):
+                                            # DocumentField形式の場合
+                                            row_data[field_name] = field_value.content
+                                        elif isinstance(field_value, dict):
+                                            # 辞書形式の場合
+                                            if 'valueString' in field_value:
+                                                row_data[field_name] = field_value['valueString']
+                                            elif 'content' in field_value:
+                                                row_data[field_name] = field_value['content']
+                                            else:
+                                                row_data[field_name] = str(field_value)
+                                        else:
+                                            # 文字列または他の形式
+                                            row_data[field_name] = field_value
+                                        
+                                        # usage_typeフィールドの選択状態を追加で確認
+                                        if field_name.startswith("usage_type_"):
+                                            # 選択状態を示す別のフィールドがあるか確認
+                                            selected_field = f"{field_name}_selected"
+                                            if selected_field in doc["fields"]:
+                                                selected_value = doc["fields"][selected_field]
+                                                if hasattr(selected_value, 'value'):
+                                                    row_data[selected_field] = selected_value.value
+                                                elif isinstance(selected_value, dict) and 'valueString' in selected_value:
+                                                    row_data[selected_field] = selected_value['valueString']
+                                                else:
+                                                    row_data[selected_field] = str(selected_value)
                                 
                                 # 領収書画像を抽出
                                 receipt_image_path = None
@@ -245,19 +291,92 @@ class OCRProcessor:
                                             # OpenAIで領収書を解析
                                             if analyze_receipts and self.receipt_analyzer and receipt_image_path:
                                                 try:
-                                                    receipt_info = self.receipt_analyzer.analyze_receipt_image(receipt_image_path)
-                                                    # 解析結果を行データに追加
-                                                    row_data["payee_name"] = receipt_info.get("payee_name", "")
-                                                    row_data["payee_address"] = receipt_info.get("payee_address", "")
-                                                    row_data["payment_date_extracted"] = receipt_info.get("payment_date", "")
-                                                    row_data["payment_purpose"] = receipt_info.get("payment_purpose", "")
+                                                    # 活動内容と金額を取得(妥当性評価用)
+                                                    activity_desc = row_data.get("activity_description", "")
+                                                    amount = row_data.get("amount", "")
+                                                    
+                                                    receipt_info = self.receipt_analyzer.analyze_receipt_image(
+                                                        receipt_image_path,
+                                                        activity_description=activity_desc,
+                                                        amount=str(amount)
+                                                    )
+                                                    
+                                                    # AI解析結果を保存するための辞書
+                                                    ai_results = {
+                                                        "payee_name": receipt_info.get("payee_name", ""),
+                                                        "payee_address": receipt_info.get("payee_address", ""),
+                                                        "payment_date_extracted": receipt_info.get("payment_date", ""),
+                                                        "payment_purpose": receipt_info.get("payment_purpose", ""),
+                                                        "validity_score": receipt_info.get("validity_score", ""),
+                                                        "validity_reason": receipt_info.get("validity_reason", ""),
+                                                        "payee_detail": receipt_info.get("payee_detail", ""),
+                                                        "transparency_score": receipt_info.get("transparency_score", ""),
+                                                        "alternative_suggestion": receipt_info.get("alternative_suggestion", ""),
+                                                        "news_value_potential_score": receipt_info.get("news_value_potential_score", ""),
+                                                        "news_value_potential_score_reason": receipt_info.get("news_value_potential_reason", "")
+                                                    }
+                                                    
+                                                    # payee_detailから業種とウェブサイトを抽出
+                                                    payee_detail = receipt_info.get("payee_detail", "")
+                                                    business_type = ""
+                                                    website = ""
+                                                    
+                                                    if "業種:" in payee_detail:
+                                                        # "業種: XXX"のパターンを探す
+                                                        match = re.search(r"業種:\s*([^/]+?)(?:\s*/|$)", payee_detail)
+                                                        if match:
+                                                            business_type = match.group(1).strip()
+                                                    
+                                                    if "Web:" in payee_detail:
+                                                        # "Web: XXX"のパターンを探す
+                                                        match = re.search(r"Web:\s*([^\s]+)", payee_detail)
+                                                        if match:
+                                                            website = match.group(1).strip()
+                                                    
+                                                    ai_results["business_type"] = business_type
+                                                    ai_results["website"] = website
+                                                    
+                                                    # AI評価モードに基づいて列を追加
+                                                    if ai_mode == 1:  # すべてのAI列を出力
+                                                        for key, value in ai_results.items():
+                                                            row_data[f"AI__{key}"] = value
+                                                    elif ai_mode == 2:  # AI列を出力しない
+                                                        pass  # 何も追加しない
+                                                    elif ai_mode == 3:  # 特定のAI列のみ除外
+                                                        exclude_columns = ai_columns or []
+                                                        for key, value in ai_results.items():
+                                                            if key not in exclude_columns:
+                                                                row_data[f"AI__{key}"] = value
+                                                    elif ai_mode == 4:  # 特定のAI列のみ出力
+                                                        include_columns = ai_columns or []
+                                                        for key, value in ai_results.items():
+                                                            if key in include_columns:
+                                                                row_data[f"AI__{key}"] = value
+                                                    
                                                     logger.info(f"Receipt analysis completed for {receipt_filename}")
                                                 except Exception as e:
                                                     logger.error(f"Error analyzing receipt: {str(e)}")
-                                                    row_data["payee_name"] = ""
-                                                    row_data["payee_address"] = ""
-                                                    row_data["payment_date_extracted"] = ""
-                                                    row_data["payment_purpose"] = ""
+                                                    # エラー時は空文字を設定(モードに応じて)
+                                                    if ai_mode == 1:  # すべてのAI列を出力
+                                                        ai_columns_all = ["payee_name", "payee_address", "payment_date_extracted", "payment_purpose",
+                                                                        "validity_score", "validity_reason", "payee_detail", "business_type",
+                                                                        "website", "transparency_score", "alternative_suggestion",
+                                                                        "news_value_potential_score", "news_value_potential_score_reason"]
+                                                        for col in ai_columns_all:
+                                                            row_data[f"AI__{col}"] = ""
+                                                    elif ai_mode == 3:  # 特定のAI列のみ除外
+                                                        exclude_columns = ai_columns or []
+                                                        ai_columns_all = ["payee_name", "payee_address", "payment_date_extracted", "payment_purpose",
+                                                                        "validity_score", "validity_reason", "payee_detail", "business_type",
+                                                                        "website", "transparency_score", "alternative_suggestion",
+                                                                        "news_value_potential_score", "news_value_potential_score_reason"]
+                                                        for col in ai_columns_all:
+                                                            if col not in exclude_columns:
+                                                                row_data[f"AI__{col}"] = ""
+                                                    elif ai_mode == 4:  # 特定のAI列のみ出力
+                                                        include_columns = ai_columns or []
+                                                        for col in include_columns:
+                                                            row_data[f"AI__{col}"] = ""
                                 
                                 results.append(row_data)
                     elif result and "pages" in result:
@@ -276,14 +395,24 @@ class OCRProcessor:
         # DataFrameに変換
         if results:
             df = pd.DataFrame(results)
-            # 列の順序を整理（folder_name, filename, model_name, type, receipt_image_area, page_number_on_pdf, page_numberを最初に配置）
-            priority_cols = ["folder_name", "filename", "model_name", "type", "receipt_image_area", "page_number_on_pdf", "page_number",
-                            "payee_name", "payee_address", "payment_date_extracted", "payment_purpose"]
+            # 列の順序を整理(folder_name, filename, model_name, type, receipt_image_area, page_number_on_pdf, page_numberを最初に配置)
+            priority_cols = ["folder_name", "filename", "model_name", "type", "receipt_image_area", "page_number_on_pdf", "page_number"]
+            
+            # AI列のリスト
+            ai_cols = ["AI__payee_name", "AI__payee_address", "AI__payment_date_extracted", "AI__payment_purpose",
+                      "AI__validity_score", "AI__validity_reason", "AI__transparency_score", "AI__alternative_suggestion",
+                      "AI__news_value_potential_score", "AI__news_value_potential_score_reason",
+                      "AI__business_type", "AI__website", "AI__payee_detail"]
+            
+            # 実際に存在するAI列のみを追加
+            existing_ai_cols = [col for col in ai_cols if col in df.columns]
+            priority_cols.extend(existing_ai_cols)
+            
             other_cols = [col for col in df.columns if col not in priority_cols]
             ordered_cols = [col for col in priority_cols if col in df.columns] + other_cols
             return df[ordered_cols]
         else:
-            # 空のDataFrameを返す（構造化フィールド用の列）
+            # 空のDataFrameを返す(構造化フィールド用の列)
             return pd.DataFrame(columns=["folder_name", "filename", "page_number"])
     
     def extract_receipt_images(self, folder_path: str, form_type: str, output_folder: str = "receipt_images") -> None:
@@ -338,13 +467,13 @@ class OCRProcessor:
         座標文字列を解析してリストに変換
         
         Args:
-            coord_string: 座標文字列（例: "1359,1341,1387,1971,112,2027,85,1397"）
+            coord_string: 座標文字列 (例: "1359,1341,1387,1971,112,2027,85,1397")
             
         Returns:
             座標のリスト [x1, y1, x2, y2, x3, y3, x4, y4]
         """
         try:
-            # Point形式の場合（例: "Point(x=1359.0, y=1341.0),Point(x=1387.0, y=1971.0),..."）
+            # Point形式の場合(例: "Point(x=1359.0, y=1341.0),Point(x=1387.0, y=1971.0),...")
             if "Point(" in coord_string:
                 pattern = r'[xy]=(\d+(?:\.\d+)?)'
                 matches = re.findall(pattern, coord_string)
@@ -381,7 +510,7 @@ class OCRProcessor:
             # 画像を開く
             img = Image.open(image_path)
             
-            # 座標から境界ボックスを計算（四角形の最小・最大座標）
+            # 座標から境界ボックスを計算(四角形の最小・最大座標)
             x_coords = coords[0::2]  # [x1, x2, x3, x4]
             y_coords = coords[1::2]  # [y1, y2, y3, y4]
             
@@ -407,12 +536,12 @@ class OCRProcessor:
     
     def save_to_csv(self, df: pd.DataFrame, output_path: str) -> None:
         """
-        DataFrameをTSV（タブ区切り）ファイルに保存する
+        DataFrameをTSV(タブ区切り)ファイルに保存する
         
         Args:
             df: 保存するDataFrame
-            output_path: 出力ファイルのパス（.tsv推奨）
+            output_path: 出力ファイルのパス(.tsv推奨)
         """
-        # TSV形式で保存（タブ区切り）
+        # TSV形式で保存(タブ区切り)
         df.to_csv(output_path, index=False, encoding='utf-8-sig', sep='\t')
         logger.info(f"TSV saved to: {output_path}")

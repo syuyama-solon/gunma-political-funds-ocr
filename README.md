@@ -66,6 +66,12 @@ python main.py <入力フォルダパス> <様式タイプ> [オプション]
 - `-v, --verbose`: 詳細なログ出力を有効にする
 - `--no-extract-receipts`: 領収書画像の抽出を無効にする
 - `--no-analyze-receipts`: 領収書画像のOpenAI解析を無効にする
+- `--ai-mode`: AI評価列の出力モード（1-4、デフォルト: 1）
+  - 1: すべてのAI列を出力（デフォルト）
+  - 2: すべてのAI列を出力しない
+  - 3: 特定の列のみ除外（--ai-columnsで指定）
+  - 4: 特定の列のみ出力（--ai-columnsで指定）
+- `--ai-columns`: モード3,4で対象となるAI列名（AI__プレフィックスなしで指定）
 
 #### 実行例
 
@@ -87,6 +93,15 @@ python main.py ./images 6-5 --no-analyze-receipts
 
 # 領収書抽出も無効化
 python main.py ./images 6-5 --no-extract-receipts
+
+# AI列を出力しない（OCRのみ）
+python main.py ./images 6-5 --ai-mode 2
+
+# 妥当性評価とニュース価値のみ出力
+python main.py ./images 6-5 --ai-mode 4 --ai-columns validity_score validity_reason news_value_potential_score
+
+# 詳細情報を除外してコンパクトな出力
+python main.py ./images 6-5 --ai-mode 3 --ai-columns payee_detail business_type website
 ```
 
 ### 設定ファイル
@@ -117,10 +132,19 @@ TSVファイルは以下の主要な列を含みます（タブ区切り）：
 | type | 様式タイプ |
 | receipt_image_area | 領収書画像の座標情報 |
 | page_number_on_pdf | PDFのページ番号 |
-| payee_name | 支出先名（OpenAI解析） |
-| payee_address | 支出先住所（OpenAI解析） |
-| payment_date_extracted | 支出日（OpenAI解析） |
-| payment_purpose | 支払い用途（OpenAI解析） |
+| AI__payee_name | 支出先名（OpenAI解析） |
+| AI__payee_address | 支出先住所（OpenAI解析） |
+| AI__payment_date_extracted | 支出日（OpenAI解析） |
+| AI__payment_purpose | 支払い用途（OpenAI解析） |
+| AI__validity_score | 妥当性スコア（0.0-1.0） |
+| AI__validity_reason | 妥当性評価の理由 |
+| AI__transparency_score | 透明性スコア（0.0-1.0） |
+| AI__alternative_suggestion | 代替案提案 |
+| AI__news_value_potential_score | ニュース価値スコア（0.0-1.0） |
+| AI__news_value_potential_score_reason | ニュース価値の理由 |
+| AI__business_type | 業種 |
+| AI__website | ウェブサイト |
+| AI__payee_detail | 支出先詳細 |
 | その他の列 | Azure OCRで抽出された各種フィールド |
 
 ## 開発
