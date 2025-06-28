@@ -1,13 +1,13 @@
 # Azure Document Intelligence OCR処理システム
 
-群馬県政治資金PDFファイル電子化プロジェクトの一部として開発されたOCR処理システムです。Azure Document Intelligenceを使用して画像ファイルから文字を抽出し、CSV形式で出力します。
+群馬県政治資金PDFファイル電子化プロジェクトの一部として開発されたOCR処理システムです。Azure Document Intelligenceを使用して画像ファイルから文字を抽出し、TSV（タブ区切り）形式で出力します。
 
 ## 機能
 
 - 複数の画像ファイル（PNG、JPG、JPEG、PDF）の一括OCR処理
 - 複数の様式に対応（様式ごとに異なる学習済みモデルを使用）
 - エラーハンドリングとログ出力
-- CSV形式での結果出力
+- TSV（タブ区切り）形式での結果出力（カンマを含むデータに対応）
 
 ## 必要条件
 
@@ -58,7 +58,7 @@ python main.py <入力フォルダパス> <様式タイプ> [オプション]
 
 #### オプション
 
-- `-o, --output`: 出力CSVファイルのパス（デフォルト: output.csv）
+- `-o, --output`: 出力TSVファイルのパス（デフォルト: output.tsv）
 - `-c, --config`: 設定ファイルのパス（JSON形式）
 - `-v, --verbose`: 詳細なログ出力を有効にする
 
@@ -69,7 +69,7 @@ python main.py <入力フォルダパス> <様式タイプ> [オプション]
 python main.py ./images 6-5
 
 # 出力ファイルを指定
-python main.py ./images 6-2-5 -o result.csv
+python main.py ./images 6-2-5 -o result.tsv
 
 # 設定ファイルを使用
 python main.py ./images 7-5 -c config.json
@@ -96,7 +96,7 @@ python main.py ./images 7-3-5 -v
 
 ## 出力形式
 
-CSVファイルは以下の列を含みます：
+TSVファイルは以下の列を含みます（タブ区切り）：
 
 | 列名 | 説明 |
 |------|------|

@@ -36,4 +36,4 @@ test_images/
 *.jpg
 *.jpeg
 *.png
-*.pdf
+*.pdftest_result*.tsv

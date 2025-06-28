@@ -40,8 +40,8 @@ def main():
     parser.add_argument(
         '-o', '--output',
         type=str,
-        default='output.csv',
-        help='出力CSVファイルのパス（デフォルト: output.csv）'
+        default='output.tsv',
+        help='出力TSVファイルのパス（デフォルト: output.tsv）'
     )
     parser.add_argument(
         '-c', '--config',
@@ -52,6 +52,12 @@ def main():
         '-v', '--verbose',
         action='store_true',
         help='詳細なログ出力を有効にする'
+    )
+    
+    parser.add_argument(
+        '--no-extract-receipts',
+        action='store_true',
+        help='領収書画像の抽出を無効にする'
     )
     
     args = parser.parse_args()
@@ -94,14 +100,19 @@ def main():
         logger.info(f"フォルダ内の画像を処理しています: {input_path}")
         logger.info(f"様式: {args.form_type}")
         
-        df = processor.process_folder(str(input_path), args.form_type)
+        # 領収書画像抽出の設定
+        extract_receipts = not args.no_extract_receipts
+        if extract_receipts:
+            logger.info("領収書画像の抽出を有効にしています")
+        
+        df = processor.process_folder(str(input_path), args.form_type, extract_receipts=extract_receipts)
         
         if df.empty:
             logger.warning("処理対象のファイルが見つかりませんでした。")
             sys.exit(0)
         
         # 結果の保存
-        logger.info(f"処理結果をCSVに保存しています: {args.output}")
+        logger.info(f"処理結果をTSVに保存しています: {args.output}")
         processor.save_to_csv(df, args.output)
         
         logger.info(f"処理完了: {len(df)}件のページを処理しました。")
