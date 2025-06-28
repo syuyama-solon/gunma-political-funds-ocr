@@ -29,11 +29,18 @@ htmlcov/
 
 # Output files
 *.csv
+*.tsv
 output/
+output.tsv
+test_result*.tsv
 
-# Test data
+# Extracted receipt images
+receipt_images/
+*/receipt_images/
+
+# Test data and images
 test_images/
 *.jpg
 *.jpeg
 *.png
-*.pdftest_result*.tsv
+*.pdf
