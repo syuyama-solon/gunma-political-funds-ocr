@@ -100,28 +100,52 @@ class OCRProcessor:
             )
             result = poller.result()
         
-        # 結果を整形
-        pages = []
-        full_text = []
-        
-        for page_idx, page in enumerate(result.pages):
-            page_text = ""
+        # 結果を整形 - documentsセクションから構造化データを抽出
+        if hasattr(result, 'documents') and result.documents:
+            # カスタムモデルの結果を返す
+            documents = []
+            for doc in result.documents:
+                doc_data = {
+                    "doc_type": doc.doc_type if hasattr(doc, 'doc_type') else None,
+                    "fields": {}
+                }
+                
+                # フィールドを抽出
+                if hasattr(doc, 'fields') and doc.fields:
+                    for field_name, field_value in doc.fields.items():
+                        if hasattr(field_value, 'value_string') and field_value.value_string:
+                            doc_data["fields"][field_name] = field_value.value_string
+                        elif hasattr(field_value, 'content') and field_value.content:
+                            doc_data["fields"][field_name] = field_value.content
+                        else:
+                            doc_data["fields"][field_name] = None
+                
+                documents.append(doc_data)
             
-            # 各ページのコンテンツを抽出
-            if hasattr(page, 'lines') and page.lines:
-                for line in page.lines:
-                    page_text += line.content + "\n"
+            return {"documents": documents}
+        else:
+            # 通常のテキスト抽出（フォールバック）
+            pages = []
+            full_text = []
             
-            pages.append({
-                "page_number": page_idx + 1,
-                "text": page_text.strip()
-            })
-            full_text.append(page_text)
-        
-        return {
-            "text": "\n".join(full_text).strip(),
-            "pages": pages
-        }
+            for page_idx, page in enumerate(result.pages):
+                page_text = ""
+                
+                # 各ページのコンテンツを抽出
+                if hasattr(page, 'lines') and page.lines:
+                    for line in page.lines:
+                        page_text += line.content + "\n"
+                
+                pages.append({
+                    "page_number": page_idx + 1,
+                    "text": page_text.strip()
+                })
+                full_text.append(page_text)
+            
+            return {
+                "text": "\n".join(full_text).strip(),
+                "pages": pages
+            }
     
     def process_folder(self, folder_path: str, form_type: str) -> pd.DataFrame:
         """
@@ -147,8 +171,22 @@ class OCRProcessor:
                 try:
                     result = self.process_single_image(file_path, form_type)
                     
-                    if result and "pages" in result:
-                        # 各ページの結果を行として追加
+                    if result and "documents" in result:
+                        # 構造化されたフィールドの結果を処理
+                        for doc in result["documents"]:
+                            if "fields" in doc:
+                                row_data = {
+                                    "folder_name": os.path.basename(folder_path),
+                                    "filename": filename
+                                }
+                                
+                                # すべてのフィールドを列として追加
+                                for field_name, field_value in doc["fields"].items():
+                                    row_data[field_name] = field_value
+                                
+                                results.append(row_data)
+                    elif result and "pages" in result:
+                        # フォールバック: 通常のテキスト抽出
                         for page in result["pages"]:
                             results.append({
                                 "filename": filename,
@@ -162,10 +200,15 @@ class OCRProcessor:
         
         # DataFrameに変換
         if results:
-            return pd.DataFrame(results)
+            df = pd.DataFrame(results)
+            # 列の順序を整理（folder_name, filename, page_numberを最初に配置）
+            priority_cols = ["folder_name", "filename", "page_number"]
+            other_cols = [col for col in df.columns if col not in priority_cols]
+            ordered_cols = [col for col in priority_cols if col in df.columns] + other_cols
+            return df[ordered_cols]
         else:
-            # 空のDataFrameを返す（適切な列を持つ）
-            return pd.DataFrame(columns=["filename", "page", "ocr_result"])
+            # 空のDataFrameを返す（構造化フィールド用の列）
+            return pd.DataFrame(columns=["folder_name", "filename", "page_number"])
     
     def save_to_csv(self, df: pd.DataFrame, output_path: str) -> None:
         """

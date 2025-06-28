@@ -1,5 +1,5 @@
 azure-ai-formrecognizer==3.3.0
-azure-core==1.29.5
+azure-core>=1.30.0
 pandas==2.1.4
 python-dotenv==1.0.0
 pytest==7.4.3
